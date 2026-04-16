@@ -1,7 +1,18 @@
 'use strict';
+/**
+ * Event Controller — Stage 2 & 3
+ *
+ * Changes from Stage 1:
+ *  - GET /events      → cache-aside via CacheService (Redis → PG fallback)
+ *  - GET /events/:id  → cache-aside; available_seats sourced from Redis counter
+ *  - POST /events     → initialises Redis seat counter on create
+ */
 const { validationResult } = require('express-validator');
-const EventModel = require('../models/event.model');
+const EventModel       = require('../models/event.model');
+const SeatCounterService = require('../services/seatCounter.service');
+const CacheService     = require('../services/cache.service');
 
+// POST /events
 const createEvent = async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -11,8 +22,22 @@ const createEvent = async (req, res, next) => {
 
     const { organizer_id, category_id, title, description, location, date, capacity, price } = req.body;
     const event = await EventModel.create({
-      organizer_id, category_id, title, description, location, date, capacity, price: price || 0,
+      organizer_id, category_id, title, description, location, date,
+      capacity, price: price || 0,
     });
+
+    // Stage 2: Prime the seat counter in Redis immediately after creation
+    try {
+      await SeatCounterService.init(event.event_id, event.capacity);
+    } catch (redisErr) {
+      // Non-fatal — counter will be warmed on first GET if Redis is unavailable
+      console.warn('[Cache] Could not init seat counter:', redisErr.message);
+    }
+
+    // Invalidate event list caches so new event appears
+    try {
+      await CacheService.invalidateEventLists();
+    } catch (_) {}
 
     return res.status(201).json({ success: true, data: event });
   } catch (err) {
@@ -20,28 +45,84 @@ const createEvent = async (req, res, next) => {
   }
 };
 
+// GET /events
 const getAllEvents = async (req, res, next) => {
   try {
     const limit  = Math.min(parseInt(req.query.limit  || '20'), 100);
     const offset = parseInt(req.query.offset || '0');
+
+    // Stage 2: Try cache first
+    try {
+      const cached = await CacheService.getEventList(limit, offset);
+      if (cached) {
+        return res.status(200).json({
+          success: true, count: cached.length, data: cached,
+          meta: { source: 'cache' },
+        });
+      }
+    } catch (redisErr) {
+      console.warn('[Cache] Redis unavailable, falling back to DB:', redisErr.message);
+    }
+
+    // Cache miss → hit DB
     const events = await EventModel.findAll({ limit, offset });
-    return res.status(200).json({ success: true, count: events.length, data: events });
+
+    // Store in cache (fire-and-forget, non-fatal)
+    CacheService.setEventList(limit, offset, events).catch(() => {});
+
+    return res.status(200).json({
+      success: true, count: events.length, data: events,
+      meta: { source: 'db' },
+    });
   } catch (err) {
     next(err);
   }
 };
 
+// GET /events/:id
 const getEventById = async (req, res, next) => {
   try {
-    const event = await EventModel.findById(req.params.id);
+    const eventId = req.params.id;
+
+    // Stage 2: Try event cache first
+    let event = null;
+    try {
+      event = await CacheService.getEvent(eventId);
+    } catch (_) {}
+
     if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found' });
+      event = await EventModel.findById(eventId);
+      if (!event) {
+        return res.status(404).json({ success: false, message: 'Event not found' });
+      }
+      CacheService.setEvent(event).catch(() => {});
     }
 
-    const booked = await EventModel.getBookedSeats(event.event_id);
-    event.available_seats = event.capacity - booked;
+    // Stage 2/3: Get available seats from Redis counter
+    let available_seats = null;
+    let seats_source    = 'db';
+    try {
+      let counter = await SeatCounterService.getAvailable(eventId);
+      if (counter === null) {
+        // Cold start: compute from DB then warm Redis
+        const booked = await EventModel.getBookedSeats(eventId);
+        counter = event.capacity - booked;
+        await SeatCounterService.init(eventId, counter);
+      }
+      available_seats = counter;
+      seats_source    = 'redis';
+    } catch (redisErr) {
+      // Fallback to DB calculation
+      console.warn('[Cache] Redis unavailable for seat count, using DB:', redisErr.message);
+      const booked   = await EventModel.getBookedSeats(eventId);
+      available_seats = event.capacity - booked;
+    }
 
-    return res.status(200).json({ success: true, data: event });
+    return res.status(200).json({
+      success: true,
+      data: { ...event, available_seats },
+      meta: { seats_source },
+    });
   } catch (err) {
     next(err);
   }

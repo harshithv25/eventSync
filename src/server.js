@@ -1,21 +1,33 @@
 'use strict';
 require('dotenv').config();
-const app  = require('./app');
-const pool = require('./db/pool');
+const app        = require('./app');
+const pool       = require('./db/pool');
+const redisClient = require('./db/redis');
 
 const PORT = process.env.PORT || 3000;
 
 const start = async () => {
   try {
+    // 1. Verify PostgreSQL
     await pool.query('SELECT 1');
     console.log('✅ PostgreSQL connection verified');
 
+    // 2. Connect Redis (non-fatal — app works without it via DB fallback)
+    try {
+      await redisClient.ping();
+      console.log('✅ Redis connection verified');
+    } catch (redisErr) {
+      console.warn('⚠️  Redis unavailable at startup — running in DB-only mode:', redisErr.message);
+      console.warn('   Booking will use DB fallback (race conditions possible under high load).');
+    }
+
+    // 3. Start HTTP server
     app.listen(PORT, () => {
-      console.log(`🚀 EventScale API running at http://localhost:${PORT}`);
-      console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`\n🚀 EventScale API running at http://localhost:${PORT}`);
+      console.log(`   Environment: ${process.env.NODE_ENV || 'development'}\n`);
     });
   } catch (err) {
-    console.error('❌ Failed to connect to PostgreSQL:', err.message);
+    console.error('❌ Fatal startup error:', err.message);
     process.exit(1);
   }
 };

@@ -1,7 +1,13 @@
 'use strict';
+/**
+ * Category Controller — Stage 2
+ * Adds Redis cache-aside for GET /categories
+ */
 const { validationResult } = require('express-validator');
 const CategoryModel = require('../models/category.model');
+const CacheService  = require('../services/cache.service');
 
+// POST /categories
 const createCategory = async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -17,16 +23,37 @@ const createCategory = async (req, res, next) => {
     }
 
     const category = await CategoryModel.create({ name, description });
+
+    // Invalidate cached categories list
+    CacheService.invalidateCategories().catch(() => {});
+
     return res.status(201).json({ success: true, data: category });
   } catch (err) {
     next(err);
   }
 };
 
+// GET /categories
 const getAllCategories = async (req, res, next) => {
   try {
+    // Stage 2: Cache-aside
+    try {
+      const cached = await CacheService.getCategories();
+      if (cached) {
+        return res.status(200).json({
+          success: true, count: cached.length, data: cached,
+          meta: { source: 'cache' },
+        });
+      }
+    } catch (_) {}
+
     const categories = await CategoryModel.findAll();
-    return res.status(200).json({ success: true, count: categories.length, data: categories });
+    CacheService.setCategories(categories).catch(() => {});
+
+    return res.status(200).json({
+      success: true, count: categories.length, data: categories,
+      meta: { source: 'db' },
+    });
   } catch (err) {
     next(err);
   }
