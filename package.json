@@ -1,5 +1,5 @@
 {
-  "name": "eventscale",
+  "name": "eventsync",
   "version": "1.0.0",
   "description": "High-Concurrency Event Registration System - Backend API",
   "main": "src/server.js",

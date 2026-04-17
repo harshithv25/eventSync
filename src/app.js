@@ -27,7 +27,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // ─── Health Check ────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.status(200).json({ success: true, message: 'EventScale API is running 🚀' });
+  res.status(200).json({ success: true, message: 'eventSync API is running 🚀' });
 });
 
 // ─── Routes ──────────────────────────────────────────────────────────────────

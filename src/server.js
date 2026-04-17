@@ -23,7 +23,7 @@ const start = async () => {
 
     // 3. Start HTTP server
     app.listen(PORT, () => {
-      console.log(`\n🚀 EventScale API running at http://localhost:${PORT}`);
+      console.log(`\n🚀 eventSync API running at http://localhost:${PORT}`);
       console.log(`   Environment: ${process.env.NODE_ENV || 'development'}\n`);
     });
   } catch (err) {

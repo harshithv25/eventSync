@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * EventScale — Full API Test Suite (Stage 1, 2, 3)
+ * eventSync — Full API Test Suite (Stage 1, 2, 3)
  * --------------------------------------------------
  * Tests every API endpoint in sequence and reports pass/fail.
  * Run AFTER server is started: npm run dev
@@ -75,7 +75,7 @@ async function test(name, fn) {
 
 async function runTests() {
   console.log('\n╔══════════════════════════════════════════════════╗');
-  console.log('║    EventScale API Test Suite                     ║');
+  console.log('║    eventSync API Test Suite                      ║');
   console.log('╚══════════════════════════════════════════════════╝\n');
 
   // ── Health ──────────────────────────────────────────────────────────────────
@@ -127,7 +127,7 @@ async function runTests() {
 
   await test('POST /users/register → creates user', async () => {
     const r = await post('/users/register', {
-      name: 'Test User', email, phone: '9876543210', password: 'secret123',
+      name: 'Priya Sharma', email, phone: '9876543210', password: 'secret123',
     });
     if (r.status === 201) { USER_ID = r.body.data.user_id; return true; }
     return false;
@@ -180,8 +180,8 @@ async function runTests() {
 
   await test('POST /organizers → creates organizer', async () => {
     const r = await post('/organizers', {
-      name: 'Org Inc', email: orgEmail, phone: '1234567890',
-      organization_name: 'Test Org',
+      name: 'Tata Events', email: orgEmail, phone: '1234567890',
+      organization_name: 'Tata Group',
     });
     if (r.status === 201) { ORGANIZER_ID = r.body.data.organizer_id; return true; }
     return false;
@@ -189,7 +189,7 @@ async function runTests() {
 
   await test('POST /organizers → duplicate email returns 409', async () => {
     const r = await post('/organizers', {
-      name: 'Org2', email: orgEmail, organization_name: 'Dup Org',
+      name: 'Org2', email: orgEmail, organization_name: 'Dup Tata Group',
     });
     return r.status === 409;
   });
@@ -206,9 +206,9 @@ async function runTests() {
     const r = await post('/events', {
       organizer_id: ORGANIZER_ID,
       category_id:  CATEGORY_ID,
-      title:        'Test Conference',
+      title:        'Mumbai Tech Week',
       description:  'An end-to-end test event',
-      location:     'Test City',
+      location:     'Mumbai, MH',
       date:         '2027-01-01T10:00:00Z',
       capacity:     5,
       price:        50.00,

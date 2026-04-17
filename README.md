@@ -1,4 +1,4 @@
-# EventSync Architecture & System Analysis
+# eventSync Architecture & System Analysis
 *A Hybrid High-Concurrency Event Registration Platform*
 
 ## 1. Motivation & Problem Statement
@@ -10,7 +10,7 @@ Traditional monolith systems relying entirely on Relational Databases (like stan
 - **Heavy Read Strain:** Thousands of users rapidly hitting refresh to check ticket availability unnecessarily cripples backend relational engines.
 
 ## 2. Core Objective
-**EventScale** solves these bottlenecks by implementing a highly scalable **Hybrid Database Architecture**. It offloads volatile, high-velocity transactions to an in-memory datastore while preserving critical user ledgers in a relational schema.
+**eventSync** solves these bottlenecks by implementing a highly scalable **Hybrid Database Architecture**. It offloads volatile, high-velocity transactions to an in-memory datastore while preserving critical user ledgers in a relational schema.
 
 ## 3. The Solution Architecture
 The system decouples the "booking" logic from the "ledger" logic by pairing **PostgreSQL** with **Redis**.
@@ -28,7 +28,7 @@ Acts as the **volatile memory layer** directly handling the brunt of the high-co
 - **Concurrency Control Engine:** Handles the volatile seat inventory counts.
 
 ## 4. How It Solves Race Conditions (The "Secret Sauce")
-To guarantee absolute zero overselling, EventScale leverages **Single-Threaded Atomic Lua Scripting** in Redis.
+To guarantee absolute zero overselling, eventSync leverages **Single-Threaded Atomic Lua Scripting** in Redis.
 
 **The Workflow:**
 1. A user attempts to book a ticket.
@@ -40,11 +40,11 @@ To guarantee absolute zero overselling, EventScale leverages **Single-Threaded A
 7. If Redis approves the transaction, the API then proceeds to safely append the receipt to the PostgreSQL database.
 
 ## 5. Resilient Engineering (Graceful Degradation)
-EventScale is engineered for High Availability. If the Redis infrastructure catastrophically fails or goes offline, the Node.js backend seamlessly catches the failure state and dynamically degrades into **DB-Only Mode**. 
+eventSync is engineered for High Availability. If the Redis infrastructure catastrophically fails or goes offline, the Node.js backend seamlessly catches the failure state and dynamically degrades into **DB-Only Mode**. 
 - The system continues to operate by redirecting capacity checks through PostgreSQL aggregations. 
 - The business remains online, prioritizing survival over pure speed until Redis is restored.
 
 ## 6. Real-time Architecture Visualizer
-To strictly prove the backend logic, EventScale includes a dedicated frontend dashboard injected with Server-Sent Events (SSE). 
+To strictly prove the backend logic, eventSync includes a dedicated frontend dashboard injected with Server-Sent Events (SSE). 
 - It allows stakeholders to manually **Reseed the Database**, flushing memory layers clean.
 - It triggers deliberate **Concurrency Stress Tests**—firing synchronous booking arrays simultaneously and directly capturing and visualizing the backend's exact instantaneous queue and Atomic Rejection rate on the frontend.

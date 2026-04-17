@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * EventScale — Concurrency Stress Test (Stage 3)
+ * eventSync — Concurrency Stress Test (Stage 3)
  * ------------------------------------------------
  * Simulates N concurrent booking requests for an event with M seats.
  * Proves that the Redis atomic Lua script prevents overselling.
@@ -75,7 +75,7 @@ function getJSON(path) {
 
 async function run() {
   console.log('\n====================================================');
-  console.log('  EventScale Concurrency Test — Stage 3');
+  console.log('  eventSync Concurrency Test — Stage 3');
   console.log('====================================================');
   console.log(`  API Base:     ${BASE_URL}`);
   console.log(`  Event ID:     ${EVENT_ID}`);

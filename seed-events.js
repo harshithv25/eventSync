@@ -11,7 +11,7 @@ async function seed() {
     const orgRes = await pool.query('SELECT organizer_id FROM organizers LIMIT 1');
     let organizer_id;
     if (orgRes.rows.length === 0) {
-      const orgIns = await pool.query(`INSERT INTO organizers (name, email, phone, organization_name) VALUES ('Tech Corp', 'hello@techcorp.com', '1234567890', 'Tech Corp') RETURNING organizer_id`);
+      const orgIns = await pool.query(`INSERT INTO organizers (name, email, phone, organization_name) VALUES ('Ramesh Sharma', 'ramesh@sharmaevents.in', '9876543210', 'Sharma Events') RETURNING organizer_id`);
       organizer_id = orgIns.rows[0].organizer_id;
     } else {
       organizer_id = orgRes.rows[0].organizer_id;
@@ -29,10 +29,10 @@ async function seed() {
 
     // Dummy events dataset
     const events = [
-      { title: 'Global AI Summit 2026', location: 'San Francisco, CA', date: '2026-09-15T09:00:00Z', capacity: 1500, price: 299.99 },
-      { title: 'React vs Vue Masterclass', location: 'Remote / Online', date: '2026-05-20T10:00:00Z', capacity: 300, price: 49.00 },
-      { title: 'Exclusive Startup Pitch Night', location: 'New York, NY', date: '2026-08-10T18:00:00Z', capacity: 30, price: 15.00 },
-      { title: 'Cybersecurity BlackHat Demo', location: 'Las Vegas, NV', date: '2026-11-05T08:00:00Z', capacity: 100, price: 150.00 }
+      { title: 'Global AI Summit 2026', location: 'Bengaluru, Karnataka', date: '2026-09-15T09:00:00Z', capacity: 1500, price: 12500.00 },
+      { title: 'React vs Vue Masterclass', location: 'Hyderabad, Telangana', date: '2026-05-20T10:00:00Z', capacity: 300, price: 2999.00 },
+      { title: 'Exclusive Startup Pitch Night', location: 'Mumbai, Maharashtra', date: '2026-08-10T18:00:00Z', capacity: 30, price: 8500.00 },
+      { title: 'Cybersecurity BlackHat Demo', location: 'New Delhi, NCR', date: '2026-11-05T08:00:00Z', capacity: 100, price: 15000.00 }
     ];
 
     for (const e of events) {
