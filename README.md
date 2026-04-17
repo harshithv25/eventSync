@@ -1,4 +1,4 @@
-# EventScale Architecture & System Analysis
+# EventSync Architecture & System Analysis
 *A Hybrid High-Concurrency Event Registration Platform*
 
 ## 1. Motivation & Problem Statement
