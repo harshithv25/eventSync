@@ -27,7 +27,7 @@ Acts as the **volatile memory layer** directly handling the brunt of the high-co
 - **Cache-Aside Reads:** Heavy read operations (like loading the event dashboard) bypass Postgres entirely and fetch cached JSON directly from Redis, dropping latency from hundreds of milliseconds to `< 2ms`.
 - **Concurrency Control Engine:** Handles the volatile seat inventory counts.
 
-## 4. How It Solves Race Conditions (The "Secret Sauce")
+## 4. How It Solves Race Conditions
 To guarantee absolute zero overselling, eventSync leverages **Single-Threaded Atomic Lua Scripting** in Redis.
 
 **The Workflow:**
