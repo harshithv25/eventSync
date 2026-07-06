@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS users (
   email       VARCHAR(255)  NOT NULL UNIQUE,
   phone       VARCHAR(20),
   password    TEXT          NOT NULL,
+  booking_limit INTEGER      NOT NULL DEFAULT 10 CHECK (booking_limit > 0),
   created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 

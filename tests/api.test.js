@@ -22,16 +22,16 @@ let EVENT_ID = '', BOOKING_ID = '', PAYMENT_ID = '';
 function request(method, path, body, token) {
   return new Promise((resolve) => {
     const payload = body ? JSON.stringify(body) : null;
-    const url     = new URL(path, BASE);
+    const url = new URL(path, BASE);
     const options = {
       hostname: url.hostname,
-      port:     url.port,
-      path:     url.pathname + url.search,
+      port: url.port,
+      path: url.pathname + url.search,
       method,
       headers: {
         'Content-Type': 'application/json',
         ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
-        ...(token   ? { Authorization: `Bearer ${token}` }             : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     };
 
@@ -49,9 +49,9 @@ function request(method, path, body, token) {
   });
 }
 
-const get    = (p, t) => request('GET',    p, null, t);
-const post   = (p, b, t) => request('POST',   p, b,    t);
-const del    = (p, t) => request('DELETE', p, null, t);
+const get = (p, t) => request('GET', p, null, t);
+const post = (p, b, t) => request('POST', p, b, t);
+const del = (p, t) => request('DELETE', p, null, t);
 
 // ─── Test runner ─────────────────────────────────────────────────────────────
 
@@ -205,13 +205,13 @@ async function runTests() {
   await test('POST /events → creates event + primes Redis seat counter', async () => {
     const r = await post('/events', {
       organizer_id: ORGANIZER_ID,
-      category_id:  CATEGORY_ID,
-      title:        'Mumbai Tech Week',
-      description:  'An end-to-end test event',
-      location:     'Mumbai, MH',
-      date:         '2027-01-01T10:00:00Z',
-      capacity:     5,
-      price:        50.00,
+      category_id: CATEGORY_ID,
+      title: 'Mumbai Tech Week',
+      description: 'An end-to-end test event',
+      location: 'Mumbai, MH',
+      date: '2027-01-01T10:00:00Z',
+      capacity: 5,
+      price: 50.00,
     });
     if (r.status === 201) { EVENT_ID = r.body.data.event_id; return true; }
     console.log('   Event create error:', JSON.stringify(r.body));
@@ -236,6 +236,13 @@ async function runTests() {
       && r.body.meta?.seats_source === 'redis';
   });
 
+  await test('GET /events/:id/availability → returns basic seat info', async () => {
+    const r = await get(`/events/${EVENT_ID}/availability`);
+    return r.status === 200
+      && r.body.data?.event_id === EVENT_ID
+      && r.body.data?.available_seats === 5;
+  });
+
   await test('GET /redis/seats/:id → Redis seat counter = 5', async () => {
     const r = await get(`/redis/seats/${EVENT_ID}`);
     return r.status === 200 && r.body.available_seats === 5;
@@ -243,7 +250,7 @@ async function runTests() {
 
   await test('POST /events/:id/images → adds image', async () => {
     const r = await post(`/events/${EVENT_ID}/images`, {
-      url:      'https://example.com/img.jpg',
+      url: 'https://example.com/img.jpg',
       alt_text: 'A test image',
     });
     return r.status === 201;
@@ -318,8 +325,8 @@ async function runTests() {
 
   await test('POST /payments → creates payment', async () => {
     const r = await post('/payments', {
-      booking_id:     BOOKING_ID,
-      amount:         100.00,
+      booking_id: BOOKING_ID,
+      amount: 100.00,
       payment_method: 'card',
       payment_status: 'completed',
     }, TOKEN);
@@ -337,7 +344,7 @@ async function runTests() {
 
   await test('GET /payments/:id → returns payment', async () => {
     const r = await get(`/payments/${PAYMENT_ID}`, TOKEN);
-    return r.swtatus === 200 && r.body.data?.payment_id === PAYMENT_ID;
+    return r.status === 200 && r.body.data?.payment_id === PAYMENT_ID;
   });
 
   // ── Redis warming ────────────────────────────────────────────────────────────

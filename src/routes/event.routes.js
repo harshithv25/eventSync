@@ -1,7 +1,12 @@
 'use strict';
 const { Router } = require('express');
 const { body } = require('express-validator');
-const { createEvent, getAllEvents, getEventById } = require('../controllers/event.controller');
+const {
+  createEvent,
+  getAllEvents,
+  getEventById,
+  getEventAvailabilityEndpoint,
+} = require('../controllers/event.controller');
 const eventImageRoutes = require('./eventImage.routes');
 
 const router = Router();
@@ -20,6 +25,8 @@ router.post('/',
 );
 
 router.get('/', getAllEvents);
+
+router.get('/:id/availability', getEventAvailabilityEndpoint);
 
 router.get('/:id', getEventById);
 

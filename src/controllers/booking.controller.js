@@ -19,12 +19,11 @@
  *   This guarantees no overselling even with 10,000 concurrent requests.
  */
 const { validationResult } = require('express-validator');
-const pool             = require('../db/pool');
-const BookingModel     = require('../models/booking.model');
-const EventModel       = require('../models/event.model');
-const UserModel        = require('../models/user.model');
+const BookingModel = require('../models/booking.model');
+const EventModel = require('../models/event.model');
+const UserModel = require('../models/user.model');
 const SeatCounterService = require('../services/seatCounter.service');
-const CacheService     = require('../services/cache.service');
+const CacheService = require('../services/cache.service');
 
 // POST /bookings
 const createBooking = async (req, res, next) => {
@@ -35,6 +34,13 @@ const createBooking = async (req, res, next) => {
     }
 
     const { user_id, event_id, tickets_count } = req.body;
+    const authenticatedUserId = req.user.userId;
+
+    if (user_id && user_id !== authenticatedUserId) {
+      return res.status(403).json({ success: false, message: 'You can only create bookings for your own account.' });
+    }
+
+    const userId = authenticatedUserId;
 
     // ── Sanity checks ───────────────────────────────────────────────────────
     const event = await EventModel.findById(event_id);
@@ -42,9 +48,18 @@ const createBooking = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
-    const user = await UserModel.findById(user_id);
+    const user = await UserModel.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const bookingSummary = await UserModel.getBookingSummary(userId);
+    if (bookingSummary && bookingSummary.remaining_bookings <= 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'Booking limit reached for this user.',
+        data: bookingSummary,
+      });
     }
 
     // ── Stage 3: Atomic Redis seat reservation ───────────────────────────────
@@ -57,7 +72,7 @@ const createBooking = async (req, res, next) => {
       if (redisResult === -2) {
         // Cold start: counter key missing in Redis — warm it from DB
         console.warn('[Booking] Cold start: warming seat counter from DB for event', event_id);
-        const booked    = await EventModel.getBookedSeats(event_id);
+        const booked = await EventModel.getBookedSeats(event_id);
         const available = event.capacity - booked;
         await SeatCounterService.init(event_id, available);
 
@@ -77,7 +92,7 @@ const createBooking = async (req, res, next) => {
       console.warn('[Booking] Redis unavailable, using DB fallback:', redisErr.message);
       usedRedis = false;
 
-      const booked    = await EventModel.getBookedSeats(event_id);
+      const booked = await EventModel.getBookedSeats(event_id);
       const available = event.capacity - booked;
       if (tickets_count > available) {
         return res.status(409).json({
@@ -90,7 +105,7 @@ const createBooking = async (req, res, next) => {
     // ── Persist booking to PostgreSQL ────────────────────────────────────────
     let booking;
     try {
-      booking = await BookingModel.create({ user_id, event_id, tickets_count });
+      booking = await BookingModel.create({ user_id: userId, event_id, tickets_count });
     } catch (pgErr) {
       // PG insert failed — roll back the Redis counter to prevent phantom seat loss
       if (usedRedis) {
@@ -102,12 +117,15 @@ const createBooking = async (req, res, next) => {
     }
 
     // Invalidate the cached event data (available_seats changed)
-    CacheService.invalidateEvent(event_id).catch(() => {});
+    CacheService.invalidateEvent(event_id).catch(() => { });
 
     return res.status(201).json({
       success: true,
-      data:    booking,
-      meta:    { concurrency_control: usedRedis ? 'redis-atomic-lua' : 'db-fallback' },
+      data: booking,
+      meta: {
+        concurrency_control: usedRedis ? 'redis-atomic-lua' : 'db-fallback',
+        booking_summary: bookingSummary,
+      },
     });
   } catch (err) {
     next(err);
@@ -121,6 +139,11 @@ const getBookingById = async (req, res, next) => {
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
+
+    if (booking.user_id !== req.user.userId) {
+      return res.status(403).json({ success: false, message: 'You can only access your own bookings.' });
+    }
+
     return res.status(200).json({ success: true, data: booking });
   } catch (err) {
     next(err);
@@ -130,6 +153,10 @@ const getBookingById = async (req, res, next) => {
 // GET /users/:id/bookings
 const getBookingsByUser = async (req, res, next) => {
   try {
+    if (req.user.userId !== req.params.id) {
+      return res.status(403).json({ success: false, message: 'You can only access your own bookings.' });
+    }
+
     const user = await UserModel.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });

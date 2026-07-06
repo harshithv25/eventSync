@@ -1,7 +1,7 @@
 'use strict';
 const { validationResult } = require('express-validator');
-const PaymentModel  = require('../models/payment.model');
-const BookingModel  = require('../models/booking.model');
+const PaymentModel = require('../models/payment.model');
+const BookingModel = require('../models/booking.model');
 
 const createPayment = async (req, res, next) => {
   try {
@@ -15,6 +15,10 @@ const createPayment = async (req, res, next) => {
     const booking = await BookingModel.findById(booking_id);
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    if (booking.user_id !== req.user.userId) {
+      return res.status(403).json({ success: false, message: 'You can only create payments for your own bookings.' });
     }
 
     const existing = await PaymentModel.findByBooking(booking_id);
@@ -35,6 +39,11 @@ const getPaymentById = async (req, res, next) => {
     if (!payment) {
       return res.status(404).json({ success: false, message: 'Payment not found' });
     }
+
+    if (payment.user_id !== req.user.userId) {
+      return res.status(403).json({ success: false, message: 'You can only access your own payments.' });
+    }
+
     return res.status(200).json({ success: true, data: payment });
   } catch (err) {
     next(err);

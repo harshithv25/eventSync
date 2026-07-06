@@ -8,9 +8,10 @@
  *  - POST /events     → initialises Redis seat counter on create
  */
 const { validationResult } = require('express-validator');
-const EventModel       = require('../models/event.model');
+const EventModel = require('../models/event.model');
 const SeatCounterService = require('../services/seatCounter.service');
-const CacheService     = require('../services/cache.service');
+const CacheService = require('../services/cache.service');
+const { getEventAvailability } = require('../services/availability.service');
 
 // POST /events
 const createEvent = async (req, res, next) => {
@@ -37,7 +38,7 @@ const createEvent = async (req, res, next) => {
     // Invalidate event list caches so new event appears
     try {
       await CacheService.invalidateEventLists();
-    } catch (_) {}
+    } catch (_) { }
 
     return res.status(201).json({ success: true, data: event });
   } catch (err) {
@@ -48,7 +49,7 @@ const createEvent = async (req, res, next) => {
 // GET /events
 const getAllEvents = async (req, res, next) => {
   try {
-    const limit  = Math.min(parseInt(req.query.limit  || '20'), 100);
+    const limit = Math.min(parseInt(req.query.limit || '20'), 100);
     const offset = parseInt(req.query.offset || '0');
 
     // Stage 2: Try cache first
@@ -68,7 +69,7 @@ const getAllEvents = async (req, res, next) => {
     const events = await EventModel.findAll({ limit, offset });
 
     // Store in cache (fire-and-forget, non-fatal)
-    CacheService.setEventList(limit, offset, events).catch(() => {});
+    CacheService.setEventList(limit, offset, events).catch(() => { });
 
     return res.status(200).json({
       success: true, count: events.length, data: events,
@@ -79,53 +80,45 @@ const getAllEvents = async (req, res, next) => {
   }
 };
 
-// GET /events/:id
 const getEventById = async (req, res, next) => {
   try {
-    const eventId = req.params.id;
+    const availability = await getEventAvailability(req.params.id);
 
-    // Stage 2: Try event cache first
-    let event = null;
-    try {
-      event = await CacheService.getEvent(eventId);
-    } catch (_) {}
-
-    if (!event) {
-      event = await EventModel.findById(eventId);
-      if (!event) {
-        return res.status(404).json({ success: false, message: 'Event not found' });
-      }
-      CacheService.setEvent(event).catch(() => {});
-    }
-
-    // Stage 2/3: Get available seats from Redis counter
-    let available_seats = null;
-    let seats_source    = 'db';
-    try {
-      let counter = await SeatCounterService.getAvailable(eventId);
-      if (counter === null) {
-        // Cold start: compute from DB then warm Redis
-        const booked = await EventModel.getBookedSeats(eventId);
-        counter = event.capacity - booked;
-        await SeatCounterService.init(eventId, counter);
-      }
-      available_seats = counter;
-      seats_source    = 'redis';
-    } catch (redisErr) {
-      // Fallback to DB calculation
-      console.warn('[Cache] Redis unavailable for seat count, using DB:', redisErr.message);
-      const booked   = await EventModel.getBookedSeats(eventId);
-      available_seats = event.capacity - booked;
+    if (!availability) {
+      return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
     return res.status(200).json({
       success: true,
-      data: { ...event, available_seats },
-      meta: { seats_source },
+      data: { ...availability.event, available_seats: availability.availableSeats },
+      meta: { seats_source: availability.seatsSource },
     });
   } catch (err) {
     next(err);
   }
 };
 
-module.exports = { createEvent, getAllEvents, getEventById };
+const getEventAvailabilityEndpoint = async (req, res, next) => {
+  try {
+    const availability = await getEventAvailability(req.params.id);
+
+    if (!availability) {
+      return res.status(404).json({ success: false, message: 'Event not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        event_id: availability.event.event_id,
+        title: availability.event.title,
+        capacity: availability.event.capacity,
+        available_seats: availability.availableSeats,
+      },
+      meta: { seats_source: availability.seatsSource },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { createEvent, getAllEvents, getEventById, getEventAvailabilityEndpoint };
