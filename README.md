@@ -37,6 +37,7 @@ Acts as the **volatile memory layer** directly handling the brunt of the high-co
 - **Concurrency Control Engine:** Handles the volatile seat inventory counts.
 
 ## 4. How It Solves Race Conditions (The "Secret Sauce")
+
 To guarantee absolute zero overselling, eventSync leverages **Single-Threaded Atomic Lua Scripting** in Redis.
 
 **The Workflow:**
